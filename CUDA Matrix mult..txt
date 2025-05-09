@@ -1,0 +1,74 @@
+#include <iostream>
+#include <cstdlib>
+
+using namespace std;
+
+__global__ void matMul(float *A, float *B, float *C, int N) {
+    int row = blockIdx.y * blockDim.y + threadIdx.y;
+    int col = blockIdx.x * blockDim.x + threadIdx.x;
+    if (row < N && col < N) {
+        float sum = 0;
+        for (int k = 0; k < N; k++)
+            sum += A[row * N + k] * B[k * N + col];
+        C[row * N + col] = sum;
+    }
+}
+
+int main() {
+    int N = 2;  // Hardcoding matrix size as 2x2 for example
+    size_t size = N * N * sizeof(float);
+
+    // Allocate memory for host matrices
+    float *A = (float*)malloc(size);
+    float *B = (float*)malloc(size);
+    float *C = (float*)malloc(size);
+
+    // Hardcoded input for matrix A
+    float A_values[] = {1, 2, 3, 4};
+    for (int i = 0; i < N * N; i++) {
+        A[i] = A_values[i];
+    }
+
+    // Hardcoded input for matrix B
+    float B_values[] = {5, 6, 7, 8};
+    for (int i = 0; i < N * N; i++) {
+        B[i] = B_values[i];
+    }
+
+    // Allocate memory on device
+    float *d_A, *d_B, *d_C;
+    cudaMalloc(&d_A, size);
+    cudaMalloc(&d_B, size);
+    cudaMalloc(&d_C, size);
+
+    // Copy data from host to device
+    cudaMemcpy(d_A, A, size, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B, B, size, cudaMemcpyHostToDevice);
+
+    // Define threads and blocks
+    dim3 threads(16, 16);
+    dim3 blocks((N + 15) / 16, (N + 15) / 16);
+
+    // Launch kernel
+    matMul<<<blocks, threads>>>(d_A, d_B, d_C, N);
+
+    // Copy result from device to host
+    cudaMemcpy(C, d_C, size, cudaMemcpyDeviceToHost);
+
+    // Print result matrix C
+    cout << "Result Matrix C:" << endl;
+    for (int i = 0; i < N * N; i++) {
+        cout << C[i] << " ";
+        if ((i + 1) % N == 0) cout << endl;
+    }
+
+    // Free device and host memory
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+    free(A);
+    free(B);
+    free(C);
+
+    return 0;
+}
